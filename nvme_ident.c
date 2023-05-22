@@ -21,6 +21,9 @@
 #define ACQ 0x30
 #define S_DB 0x1000
 
+#define COMMAND_IDENT   0x1234
+#define IDENTIFY_OPCODE 0x06
+
 
 u8 __iomem *hwmem;
 
@@ -142,20 +145,20 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     //printk("%px %px %pax %pax \n",sub_v, comp_v, sub_p, comp_p);
     //printk("%px %px  \n",sub_v, comp_v);
     printk("SUB_P %llx COMP_P %llx  \n",(u64)sub_p, (u64)comp_p);
-    *sub_v = 0x12340006; sub_v++;
+    *sub_v = (COMMAND_IDENT << 16)|IDENTIFY_OPCODE; sub_v++;
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
 
-    *sub_v = (u32)prp1_p; sub_v++;
+    *sub_v = (u32)prp1_p; sub_v++; /* PRP entry 1 */
     *sub_v = (u32)(prp1_p >> 32); sub_v++;
 
-    *sub_v = 0x0; sub_v++;
+    *sub_v = 0x0; sub_v++; /* PRP entry 2 */
     *sub_v = 0x0; sub_v++;
 
-    *sub_v = 0x1; sub_v++;
+    *sub_v = 0x1; sub_v++; /* controller data structure*/
 
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
@@ -188,6 +191,7 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     dma_unmap_single(&pdev->dev, comp_p, PAGE_SIZE, DMA_FROM_DEVICE);
 #endif
 
+    printk("if success COMPLETION sould have %x\n,COMMAND_IDENT); 
     printk("COMPLETION %x %x %x %x\n",*comp_v, *(comp_v+1), *(comp_v+2), *(comp_v+3));
 
     printk("identify %x %x %x %x\n",*prp1_v, *(prp1_v+1), *(prp1_v+2), *(prp1_v+3));
