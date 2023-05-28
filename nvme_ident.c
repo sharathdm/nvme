@@ -29,6 +29,7 @@ u8 __iomem *hwmem;
 
 static struct pci_device_id nvme_driver_id_table[] = {
     { PCI_DEVICE(0xc0a9, 0x540a) },
+    { PCI_DEVICE(0x144d, 0xa808) },
     {0,}
 };
 
@@ -128,6 +129,8 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     /* Remap BAR to the local pointer */
     hwmem = ioremap(mmio_start, mmio_len);
 
+    pci_enable_pcie_error_reporting(pdev);
+	
     printk("CAP %x %x\n",ioread32(hwmem),ioread32(hwmem+4));
     printk("VS %x \n",ioread32(hwmem+VS));
 #ifdef ALLOC_COHERENT
@@ -199,13 +202,14 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     printk("identify %x %x %x %x\n",*(prp1_v+8), *(prp1_v+9), *(prp1_v+10), *(prp1_v+11));
     printk("identify %x %x %x %x\n",*(prp1_v+12), *(prp1_v+13), *(prp1_v+14), *(prp1_v+15));
 
-pci_enable_pcie_error_reporting(pdev);
     return 0;
 }
 
 /* Clean up */
 static void nvme_driver_remove(struct pci_dev *pdev)
 {
+	pci_disable_pcie_error_reporting(pdev);
+	
     /* reset device */
     u32 temp = ioread32(hwmem+CC);
     iowrite32(temp&0xfffffffe, hwmem+CC);
