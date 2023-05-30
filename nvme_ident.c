@@ -109,14 +109,15 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
 
     /* Enable device memory */
     err = pci_enable_device_mem(pdev);
-
     if (err) {
         return err;
     }
+	
+	/* uncomment for testing AER */
+    //pci_write_config_word(pdev, PCI_COMMAND, 0x0);
 
     /* Request memory region for the BAR */
     err = pci_request_region(pdev, bar, NVME_DRIVER);
-
     if (err) {
         pci_disable_device(pdev);
         return err;
