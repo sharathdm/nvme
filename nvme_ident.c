@@ -177,9 +177,9 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
 
     iowrite32(0x001F001F , hwmem+AQA);
     iowrite32(sub_p , hwmem+ASQ);
-    iowrite32((sub_p>>32) , hwmem+0x2c+0x4);
+    iowrite32((sub_p>>32) , hwmem+ASQ+0x4);
     iowrite32(comp_p , hwmem+ACQ);
-    iowrite32((comp_p>>32) , hwmem+0x34+0x4);
+    iowrite32((comp_p>>32) , hwmem+ACQ+0x4);
 
     temp = ioread32(hwmem+CC);
     iowrite32(temp|0x1, hwmem+CC);
