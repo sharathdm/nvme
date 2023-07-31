@@ -465,10 +465,12 @@ static void nvme_driver_remove(struct pci_dev *pdev)
     dma_free_coherent(&pdev->dev, PAGE_SIZE, sub_v, sub_p);
     dma_free_coherent(&pdev->dev, PAGE_SIZE, comp_v, comp_p);
     dma_free_coherent(&pdev->dev, PAGE_SIZE, prp1_v, prp1_p);
+	dma_free_coherent(&pdev->dev, PAGE_SIZE, prp2_v, prp2_p);
 #else
     kfree(sub_v);
     kfree(comp_v);
     kfree(prp1_v);
+	kfree(prp2_v);
 #endif
 
     /* Free memory region */
