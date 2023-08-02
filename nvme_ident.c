@@ -11,6 +11,7 @@
 #define NVME_DRIVER "nvme_pci_driver"
 
 //#define ALLOC_COHERENT
+#define TEST_INTR
 
 #define CAP 0x0
 #define VS 0x8
@@ -97,20 +98,31 @@ dma_addr_t sub_p_q1;
 u32 *comp_v_q1;
 dma_addr_t comp_p_q1;
 
+#ifdef TEST_INTR
+int irq_io_0;
+
+static irqreturn_t irq_fnc(int irq, void *cookie)
+{
+   (void) cookie;
+   printk("Handle IRQ #%d\n", irq);
+   return IRQ_HANDLED;
+}
+#endif
+
 static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	int bar, err;
 	u16 vendor, device;
 	unsigned long mmio_start,mmio_len;
 	u32 temp;
-	int i,j;
+	int i;
 	/* Let's read data from the PCI device configuration registers */
     pci_read_config_word(pdev, PCI_VENDOR_ID, &vendor);
     pci_read_config_word(pdev, PCI_DEVICE_ID, &device);
 
     printk(KERN_INFO "Device vid: 0x%X pid: 0x%X\n", vendor, device);
 
-    pci_enable_device(pdev);
+    err = pci_enable_device(pdev);
     pci_set_master(pdev);
      /* Request IO BAR */
     bar = pci_select_bars(pdev, IORESOURCE_MEM);
@@ -136,16 +148,32 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     /* Remap BAR to the local pointer */
     hwmem = ioremap(mmio_start, mmio_len);
 
+#ifdef TEST_INTR
+    err = pci_alloc_irq_vectors(pdev, 1, 2, PCI_IRQ_MSIX);
+    printk(" irq vectors = %x \n", err);
+
+    /* interrupt for admin queue */
+    /*irq0 = pci_irq_vector(pdev, 0);
+    err = request_irq(irq0, xxx, 0, "nvme_admin", pdev);*/
+
+    /* interrupt for io queue 1*/
+    irq_io_0 = pci_irq_vector(pdev, 1);
+    err = request_irq(irq_io_0, irq_fnc, 0, "nvme_io_0", pdev);
+#endif
+
     pci_enable_pcie_error_reporting(pdev);
 
     printk("CAP %x %x\n",ioread32(hwmem+4),ioread32(hwmem));
     printk("VS %x \n",ioread32(hwmem+VS));
+
     /* admin submit & complete */
     sub_v  = dma_alloc_coherent(&pdev->dev, PAGE_SIZE, &sub_p, GFP_KERNEL);
     comp_v = dma_alloc_coherent(&pdev->dev, PAGE_SIZE, &comp_p, GFP_KERNEL);
     /* io submit & complete */
+
     sub_v_q1  = dma_alloc_coherent(&pdev->dev, PAGE_SIZE, &sub_p_q1, GFP_KERNEL);
     comp_v_q1 = dma_alloc_coherent(&pdev->dev, PAGE_SIZE, &comp_p_q1, GFP_KERNEL);
+
 #ifdef ALLOC_COHERENT
     prp1_v = dma_alloc_coherent(&pdev->dev, PAGE_SIZE, &prp1_p, GFP_KERNEL);
     prp2_v = dma_alloc_coherent(&pdev->dev, PAGE_SIZE, &prp2_p, GFP_KERNEL);
@@ -356,7 +384,11 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     *sub_v = 0x0; sub_v++;
 
     *sub_v = 0xf0001; sub_v++; /* queuesize|queueident*/
+#ifndef TEST_INTR
     *sub_v = 0x1; sub_v++; /* contigeous pages */
+#else
+    *sub_v = 0x10003; sub_v++; /*interrupt vector|interrupt enable|contigeous pages */
+#endif
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
@@ -391,7 +423,7 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     *sub_v = 0x0; sub_v++;
 
     *sub_v = 0xf0001; sub_v++;  /* queuesize|queueident*/
-    *sub_v = 0x10001; sub_v++; /* conpletion queue |contigeous pages */
+    *sub_v = 0x10001; sub_v++; /* completion queue ident |contigeous pages */
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
     *sub_v = 0x0; sub_v++;
@@ -455,22 +487,28 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
 /* Clean up */
 static void nvme_driver_remove(struct pci_dev *pdev)
 {
+    u32 temp;
     pci_disable_pcie_error_reporting(pdev);
 
+#ifdef TEST_INTR
+    free_irq(irq_io_0, pdev);
+    pci_free_irq_vectors(pdev);
+#endif
+
     /* reset device */
-    u32 temp = ioread32(hwmem+CC);
+    temp = ioread32(hwmem+CC);
     iowrite32(temp&0xfffffffe, hwmem+CC);
 
 #ifdef ALLOC_COHERENT
     dma_free_coherent(&pdev->dev, PAGE_SIZE, sub_v, sub_p);
     dma_free_coherent(&pdev->dev, PAGE_SIZE, comp_v, comp_p);
     dma_free_coherent(&pdev->dev, PAGE_SIZE, prp1_v, prp1_p);
-	dma_free_coherent(&pdev->dev, PAGE_SIZE, prp2_v, prp2_p);
+    dma_free_coherent(&pdev->dev, PAGE_SIZE, prp2_v, prp2_p);
 #else
     kfree(sub_v);
     kfree(comp_v);
     kfree(prp1_v);
-	kfree(prp2_v);
+    kfree(prp2_v);
 #endif
 
     /* Free memory region */
