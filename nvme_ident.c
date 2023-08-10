@@ -10,7 +10,7 @@
 
 #define NVME_DRIVER "nvme_pci_driver"
 
-//#define ALLOC_COHERENT
+#define ALLOC_COHERENT
 #define TEST_INTR
 
 #define CAP 0x0
@@ -122,6 +122,20 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
 
     printk(KERN_INFO "Device vid: 0x%X pid: 0x%X\n", vendor, device);
 
+#ifdef TEST_INTR
+    err = pci_alloc_irq_vectors(pdev, 1, 2, PCI_IRQ_MSIX);
+    printk(" irq vectors = %x \n", err);
+
+    /* interrupt for admin queue */
+    /*irq0 = pci_irq_vector(pdev, 0);
+    err = request_irq(irq0, xxx, 0, "nvme_admin", pdev);*/
+
+    /* interrupt for io queue 1*/
+    irq_io_0 = pci_irq_vector(pdev, 1);
+    err = request_irq(irq_io_0, irq_fnc, 0, "nvme_io_0", pdev);
+#endif
+
+
     err = pci_enable_device(pdev);
     pci_set_master(pdev);
      /* Request IO BAR */
@@ -147,19 +161,6 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
 
     /* Remap BAR to the local pointer */
     hwmem = ioremap(mmio_start, mmio_len);
-
-#ifdef TEST_INTR
-    err = pci_alloc_irq_vectors(pdev, 1, 2, PCI_IRQ_MSIX);
-    printk(" irq vectors = %x \n", err);
-
-    /* interrupt for admin queue */
-    /*irq0 = pci_irq_vector(pdev, 0);
-    err = request_irq(irq0, xxx, 0, "nvme_admin", pdev);*/
-
-    /* interrupt for io queue 1*/
-    irq_io_0 = pci_irq_vector(pdev, 1);
-    err = request_irq(irq_io_0, irq_fnc, 0, "nvme_io_0", pdev);
-#endif
 
     pci_enable_pcie_error_reporting(pdev);
 
@@ -283,15 +284,15 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     printk("COMPLETION %x %x %x %x\n",*comp_v, *(comp_v+1), *(comp_v+2), *(comp_v+3));
     comp_v +=4;
 
-    printk("NSZE %x %x %x %x %x %x %x %x\n",*(prp1_v+7),*(prp1_v+6),*(prp1_v+5),*(prp1_v+4),*(prp1_v+3),*(prp1_v+2),*(prp1_v+1), *(prp1_v+0));
-    printk("NCAP %x %x %x %x %x %x %x %x\n",*(prp1_v+15),*(prp1_v+14),*(prp1_v+13),*(prp1_v+12),*(prp1_v+11),*(prp1_v+10),*(prp1_v+9), *(prp1_v+8));
-    printk("NUSE %x %x %x %x %x %x %x %x\n",*(prp1_v+23),*(prp1_v+22),*(prp1_v+21),*(prp1_v+20),*(prp1_v+19),*(prp1_v+18),*(prp1_v+17), *(prp1_v+16));
-    printk("NLBAF %x\n", *(prp1_v+25));
-    printk("FLBAS %x\n", *(prp1_v+26));
-    printk("EUI %x %x %x %x %x %x %x %x\n",*(prp1_v+127),*(prp1_v+126),*(prp1_v+125),*(prp1_v+124),*(prp1_v+123),*(prp1_v+122),*(prp1_v+121), *(prp1_v+120));
-    printk("LBA format-0 %x %x %x %x\n",*(prp1_v+131),*(prp1_v+130),*(prp1_v+129),*(prp1_v+128));
-    printk("LBA format-1 %x %x %x %x\n",*(prp1_v+134),*(prp1_v+133),*(prp1_v+132),*(prp1_v+131));
-    printk("LBA format-2 %x %x %x %x\n",*(prp1_v+138),*(prp1_v+137),*(prp1_v+136),*(prp1_v+135));
+    printk("NSZE %x %x %x %x %x %x %x %x\n",*(prp1_v+7)& 0xff,*(prp1_v+6)& 0xff,*(prp1_v+5)& 0xff,*(prp1_v+4)& 0xff,*(prp1_v+3)& 0xff,*(prp1_v+2)& 0xff,*(prp1_v+1)& 0xff, *(prp1_v+0)& 0xff);
+    printk("NCAP %x %x %x %x %x %x %x %x\n",*(prp1_v+15)& 0xff,*(prp1_v+14)& 0xff,*(prp1_v+13)& 0xff,*(prp1_v+12)& 0xff,*(prp1_v+11)& 0xff,*(prp1_v+10)& 0xff,*(prp1_v+9)& 0xff, *(prp1_v+8)& 0xff);
+    printk("NUSE %x %x %x %x %x %x %x %x\n",*(prp1_v+23)& 0xff,*(prp1_v+22)& 0xff,*(prp1_v+21)& 0xff,*(prp1_v+20)& 0xff,*(prp1_v+19)& 0xff,*(prp1_v+18)& 0xff,*(prp1_v+17)& 0xff, *(prp1_v+16)& 0xff);
+    printk("NLBAF %x\n", *(prp1_v+25)& 0xff);
+    printk("FLBAS %x\n", *(prp1_v+26)& 0xff);
+    printk("EUI %x %x %x %x %x %x %x %x\n",*(prp1_v+127)& 0xff,*(prp1_v+126)& 0xff,*(prp1_v+125)& 0xff,*(prp1_v+124)& 0xff,*(prp1_v+123)& 0xff,*(prp1_v+122)& 0xff,*(prp1_v+121)& 0xff, *(prp1_v+120)& 0xff);
+    printk("LBA format-0 %x %x %x %x\n",*(prp1_v+131)& 0xff,*(prp1_v+130)& 0xff,*(prp1_v+129)& 0xff,*(prp1_v+128)& 0xff);
+    printk("LBA format-1 %x %x %x %x\n",*(prp1_v+134)& 0xff,*(prp1_v+133)& 0xff,*(prp1_v+132)& 0xff,*(prp1_v+131)& 0xff);
+    printk("LBA format-2 %x %x %x %x\n",*(prp1_v+138)& 0xff,*(prp1_v+137)& 0xff,*(prp1_v+136)& 0xff,*(prp1_v+135)& 0xff);
 
     iowrite32(0x2, hwmem+C_DB);
     printk("C_DB %x \n",ioread32(hwmem+C_DB));
@@ -478,7 +479,7 @@ static int nvme_driver_probe(struct pci_dev *pdev, const struct pci_device_id *e
     printk("C_DB_Q1 %x \n",ioread32(hwmem+C_DB_Q1));
 
     for (i=0; i<32; i++) {
-            printk("%x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x\n",*(prp1_v+(16*i)+0),*(prp1_v+(16*i)+1),*(prp1_v+(16*i)+2),*(prp1_v+(16*i)+3),*(prp1_v+(16*i)+4),*(prp1_v+(16*i)+5),*(prp1_v+(16*i)+6),*(prp1_v+(16*i)+7),*(prp1_v+(16*i)+8),*(prp1_v+(16*i)+9),*(prp1_v+(16*i)+10),*(prp1_v+(16*i)+11),*(prp1_v+(16*i)+12),*(prp1_v+(16*i)+13),*(prp1_v+(16*i)+14),*(prp1_v+(16*i)+15));
+            printk("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",*(prp1_v+(16*i)+0)& 0xff,*(prp1_v+(16*i)+1)& 0xff,*(prp1_v+(16*i)+2)& 0xff,*(prp1_v+(16*i)+3)& 0xff,*(prp1_v+(16*i)+4)& 0xff,*(prp1_v+(16*i)+5)& 0xff,*(prp1_v+(16*i)+6)& 0xff,*(prp1_v+(16*i)+7)& 0xff,*(prp1_v+(16*i)+8)& 0xff,*(prp1_v+(16*i)+9)& 0xff,*(prp1_v+(16*i)+10)& 0xff,*(prp1_v+(16*i)+11)& 0xff,*(prp1_v+(16*i)+12)& 0xff,*(prp1_v+(16*i)+13)& 0xff,*(prp1_v+(16*i)+14)& 0xff,(unsigned)*(prp1_v+(16*i)+15)& 0xff);
     }
 
     return 0;
